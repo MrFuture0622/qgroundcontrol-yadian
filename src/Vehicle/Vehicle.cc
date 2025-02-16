@@ -3866,6 +3866,15 @@ void Vehicle::clearAllParamMapRC(void)
     }
 }
 
+namespace {
+constexpr int wheelRadius = 46;
+constexpr int wheelDistance = 216;
+constexpr float maxMotorSpeed = 5;
+constexpr float maxWheelSpeed = maxMotorSpeed * wheelRadius;
+constexpr float maxLinearVelocity = maxWheelSpeed;
+constexpr float maxAngularVelocity = 2 * maxWheelSpeed / wheelDistance;
+}
+
 void Vehicle::sendJoystickDataThreadSafe(float roll, float pitch, float yaw, float thrust, quint16 buttons)
 {
     SharedLinkInterfacePtr sharedLink = vehicleLinkManager()->primaryLink().lock();
@@ -3878,7 +3887,10 @@ void Vehicle::sendJoystickDataThreadSafe(float roll, float pitch, float yaw, flo
         return;
     }
 
+    bool ret = false;
     mavlink_message_t message;
+    uint8_t payloadBytes;
+    std::string payloadStr;
 
     // Incoming values are in the range -1:1
     float axesScaling =         1.0 * 1000.0;
@@ -3887,22 +3899,102 @@ void Vehicle::sendJoystickDataThreadSafe(float roll, float pitch, float yaw, flo
     float newYawCommand    =    yaw * axesScaling;
     float newThrustCommand =    thrust * axesScaling;
 
-    mavlink_msg_manual_control_pack_chan(
+    // TODO J: 手柄数据发送 加入新定义的消息头文件，并修改此函数
+    // mavlink_msg_manual_control_pack_chan(
+    //     static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
+    //     static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
+    //     sharedLink->mavlinkChannel(),
+    //     &message,
+    //     static_cast<uint8_t>(_id),
+    //     static_cast<int16_t>(newPitchCommand),
+    //     static_cast<int16_t>(newRollCommand),
+    //     static_cast<int16_t>(newThrustCommand),
+    //     static_cast<int16_t>(newYawCommand),
+    //     buttons, 0,
+    //     0,
+    //     0, 0,
+    //     0, 0, 0, 0, 0, 0
+    //     );
+
+    thrust = thrust * 2 - 1;
+
+    float v = thrust * maxLinearVelocity;
+    float w = yaw * maxAngularVelocity;
+
+    float vl = (v + (w * wheelDistance / 2)) / wheelRadius;
+    float vr = (v - (w * wheelDistance / 2)) / wheelRadius;
+
+    vl = std::max(-maxMotorSpeed, std::min(vl, maxMotorSpeed));
+    vr = std::max(-maxMotorSpeed, std::min(vr, maxMotorSpeed));
+    mavlink_msg_motor_can_pack_chan(
         static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
         static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
         sharedLink->mavlinkChannel(),
         &message,
-        static_cast<uint8_t>(_id),
-        static_cast<int16_t>(newPitchCommand),
-        static_cast<int16_t>(newRollCommand),
-        static_cast<int16_t>(newThrustCommand),
-        static_cast<int16_t>(newYawCommand),
-        buttons, 0,
-        0,
-        0, 0,
-        0, 0, 0, 0, 0, 0
-    );
+        1,
+        vl,
+        vr
+        );
+    ret = sendMessageOnLinkThreadSafe(sharedLink.get(), message);
+    payloadStr = "";
+    for (int i=0; i<message.len; ++i) {
+        payloadBytes = *((uint8_t*)message.payload64 + i);
+        payloadStr += std::to_string(payloadBytes);
+        payloadStr += " ";
+    }
+    qCDebug(JoystickLog) << "Send [MotorCan] Message: " << ret << payloadStr;
+
+    // 云台舵机速度为定值30
+    // roll对应左右转 -1~1映射成1375~1975~2575
+    int16_t hAngle = roll * 600 + 1975;
+    mavlink_msg_gimbal_pack_chan(
+        static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
+        static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
+        sharedLink->mavlinkChannel(),
+        &message,
+        1,
+        30,
+        hAngle
+        );
     sendMessageOnLinkThreadSafe(sharedLink.get(), message);
+    payloadStr = "";
+    for (int i=0; i<message.len; ++i) {
+        payloadBytes = *((uint8_t*)message.payload64 + i);
+        payloadStr += std::to_string(payloadBytes);
+        payloadStr += " ";
+    }
+    qCDebug(JoystickLog) << "Send [Gimbal_1] Message: " << ret << payloadStr;
+
+
+    // pitch对应上下转 1~-1映射成2700～2450～2000
+    int16_t vAngle = 2450;
+    if (pitch < 0) {
+        vAngle += pitch * 450;
+    } else {
+        vAngle += pitch * 250;
+    }
+    mavlink_msg_gimbal_pack_chan(
+        static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
+        static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
+        sharedLink->mavlinkChannel(),
+        &message,
+        0,
+        30,
+        vAngle
+        );
+    sendMessageOnLinkThreadSafe(sharedLink.get(), message);
+    payloadStr = "";
+    for (int i=0; i<message.len; ++i) {
+        payloadBytes = *((uint8_t*)message.payload64 + i);
+        payloadStr += std::to_string(payloadBytes);
+        payloadStr += " ";
+    }
+    qCDebug(JoystickLog) << "Send [Gimbal_2] Message: " << ret << payloadStr;
+
+
+    qCDebug(JoystickValuesLog) << "Joystick Value" << vl << vr << hAngle << vAngle;
+
+    // sendMessageOnLinkThreadSafe(sharedLink.get(), message);
 }
 
 void Vehicle::triggerSimpleCamera()
