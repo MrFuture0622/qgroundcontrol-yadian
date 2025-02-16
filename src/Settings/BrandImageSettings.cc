@@ -13,8 +13,11 @@
 
 DECLARE_SETTINGGROUP(BrandImage, "Branding")
 {
+    userBrandImageIndoor()->setRawValue("qrc:/qmlimages/logo.png");
+    userBrandImageOutdoor()->setRawValue("qrc:/qmlimages/logo.png");
     qmlRegisterUncreatableType<BrandImageSettings>("QGroundControl.SettingsManager", 1, 0, "BrandImageSettings", "Reference only"); \
 }
+
 
 DECLARE_SETTINGSFACT(BrandImageSettings, userBrandImageIndoor)
 DECLARE_SETTINGSFACT(BrandImageSettings, userBrandImageOutdoor)
