@@ -3942,7 +3942,7 @@ void Vehicle::sendJoystickDataThreadSafe(float roll, float pitch, float yaw, flo
         payloadStr += std::to_string(payloadBytes);
         payloadStr += " ";
     }
-    qCDebug(JoystickLog) << "Send [MotorCan] Message: " << ret << payloadStr;
+    // qCDebug(JoystickLog) << "Send [MotorCan] Message: " << ret << payloadStr;
 
     // 云台舵机速度为定值30
     // roll对应左右转 -1~1映射成1375~1975~2575
@@ -3963,7 +3963,7 @@ void Vehicle::sendJoystickDataThreadSafe(float roll, float pitch, float yaw, flo
         payloadStr += std::to_string(payloadBytes);
         payloadStr += " ";
     }
-    qCDebug(JoystickLog) << "Send [Gimbal_1] Message: " << ret << payloadStr;
+    // qCDebug(JoystickLog) << "Send [Gimbal_1] Message: " << ret << payloadStr;
 
 
     // pitch对应上下转 1~-1映射成2700～2450～2000
@@ -3989,10 +3989,54 @@ void Vehicle::sendJoystickDataThreadSafe(float roll, float pitch, float yaw, flo
         payloadStr += std::to_string(payloadBytes);
         payloadStr += " ";
     }
-    qCDebug(JoystickLog) << "Send [Gimbal_2] Message: " << ret << payloadStr;
+    // qCDebug(JoystickLog) << "Send [Gimbal_2] Message: " << ret << payloadStr;
 
 
-    qCDebug(JoystickValuesLog) << "Joystick Value" << vl << vr << hAngle << vAngle;
+    // 按键a->bit0->LED2, 按键b->bit1->LED3, 按键x->bit2->LED1
+    static bool led1 = false, led2 = false, led3 = false;
+    static quint16 lastButtons = 0; // 显式初始化
+    static qint64 lastEdgeTime = 0;
+    constexpr quint16 BUTTON_A_MASK = 0x1;
+    constexpr quint16 BUTTON_B_MASK = 0x2;
+    constexpr quint16 BUTTON_X_MASK = 0x4;
+    // 防抖逻辑
+    qint64 currentTime = QDateTime::currentMSecsSinceEpoch();
+    if ((currentTime - lastEdgeTime) > 5) {
+        if ((!(lastButtons & BUTTON_X_MASK)) && (buttons & BUTTON_X_MASK)) {
+            led1 = !led1;
+            qCDebug(JoystickLog) << "LED1 Switch" << (lastButtons & BUTTON_X_MASK) << (buttons & BUTTON_X_MASK);
+        }
+        if ((!(lastButtons & BUTTON_A_MASK)) && (buttons & BUTTON_A_MASK)) {
+            led2 = !led2;
+            qCDebug(JoystickLog) << "LED2 Switch" << (lastButtons & BUTTON_A_MASK) << (buttons & BUTTON_A_MASK);
+        }
+        if ((!(lastButtons & BUTTON_B_MASK)) && (buttons & BUTTON_B_MASK)) {
+            led3 = !led3;
+            qCDebug(JoystickLog) << "LED3 Switch" << (lastButtons & BUTTON_B_MASK) << (buttons & BUTTON_B_MASK);
+        }
+        lastEdgeTime = currentTime;
+    }
+    lastButtons = buttons;
+    mavlink_msg_led_pack_chan(
+        static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
+        static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
+        sharedLink->mavlinkChannel(),
+        &message,
+        (uint8_t)led1,
+        (uint8_t)led2,
+        (uint8_t)led3
+        );
+    sendMessageOnLinkThreadSafe(sharedLink.get(), message);
+    payloadStr = "";
+    for (int i=0; i<message.len; ++i) {
+        payloadBytes = *((uint8_t*)message.payload64 + i);
+        payloadStr += std::to_string(payloadBytes);
+        payloadStr += " ";
+    }
+    qCDebug(JoystickLog) << "Send [LED] Message: " << ret << payloadStr;
+
+
+    qCDebug(JoystickValuesLog) << "Joystick Value" << vl << vr << hAngle << vAngle << buttons;
 
     // sendMessageOnLinkThreadSafe(sharedLink.get(), message);
 }
