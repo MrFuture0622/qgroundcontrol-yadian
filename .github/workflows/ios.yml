@@ -47,14 +47,14 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - uses: seanmiddleditch/gha-setup-ninja@v5
+      - uses: seanmiddleditch/gha-setup-ninja@v6
 
       - name: Install Dependencies
         run: |
           brew update
           brew install cmake ninja ccache
 
-      - uses: seanmiddleditch/gha-setup-ninja@v5
+      - uses: seanmiddleditch/gha-setup-ninja@v6
       - uses: lukka/get-cmake@latest
 
       - name: Set Up Cache

@@ -55,7 +55,7 @@ jobs:
           )
           xcopy /E /I ".\custom-example" ".\custom"
 
-      - uses: seanmiddleditch/gha-setup-ninja@v5
+      - uses: seanmiddleditch/gha-setup-ninja@v6
       - uses: lukka/get-cmake@latest
 
       # - name: Install Vulkan

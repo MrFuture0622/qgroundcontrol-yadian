@@ -49,7 +49,7 @@ jobs:
           fetch-tags: true
           fetch-depth: 0
 
-      - uses: seanmiddleditch/gha-setup-ninja@v5
+      - uses: seanmiddleditch/gha-setup-ninja@v6
       - uses: lukka/get-cmake@latest
       - uses: mozilla-actions/sccache-action@v0.0.7
 
