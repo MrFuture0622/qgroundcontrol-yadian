@@ -104,7 +104,7 @@ jobs:
       #   uses: ./.github/actions/gstreamer
 
       - uses: lukka/get-cmake@latest
-      - uses: seanmiddleditch/gha-setup-ninja@v5
+      - uses: seanmiddleditch/gha-setup-ninja@v6
 
       - run: mkdir ${{ runner.temp }}/shadow_build_dir
 

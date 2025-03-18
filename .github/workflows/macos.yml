@@ -51,14 +51,14 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - uses: seanmiddleditch/gha-setup-ninja@v5
+      - uses: seanmiddleditch/gha-setup-ninja@v6
 
       - name: Install Dependencies
         working-directory: ${{ github.workspace }}/tools/setup
         run: sh macos-dependencies.sh
 
       - uses: lukka/get-cmake@latest
-      - uses: seanmiddleditch/gha-setup-ninja@v5
+      - uses: seanmiddleditch/gha-setup-ninja@v6
 
       - name: Install Gstreamer
         run: |
